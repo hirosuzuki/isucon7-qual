@@ -729,6 +729,11 @@ func postProfile(c echo.Context) error {
 		if err != nil {
 			return err
 		}
+
+		fp, err := os.Create("/home/isucon/isubata/webapp/public/icons/" + avatarName)
+		fp.Write(avatarData)
+		defer fp.Close()
+
 		_, err = db.Exec("UPDATE user SET avatar_icon = ? WHERE id = ?", avatarName, self.ID)
 		if err != nil {
 			return err
