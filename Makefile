@@ -1,30 +1,39 @@
-SRV_A=35.243.102.51
-SRV_BENCH=10.10.10.10
+SERVER_A=35.243.102.51
+SERVER_B=34.84.67.160
+SERVER_C=34.84.11.210
+SERVER_BENCH=10.10.10.10
 
 build:
 	go build
 
+copy-key:
+	ssh-copy-id -i ${HOME}/.ssh/id_ed25519.pub ${SERVER_A}
+	ssh-copy-id -i ${HOME}/.ssh/id_ed25519.pub ${SERVER_B}
+	ssh-copy-id -i ${HOME}/.ssh/id_ed25519.pub ${SERVER_C}
+
 init-load:
-	scp ${SRV_A}:/etc/nginx/nginx.conf .
+	mkdir -p initfiles
+	scp ${SERVER_A}:/etc/nginx/nginx.conf initfiles/nginx.conf-a
+	scp ${SERVER_B}:/etc/nginx/nginx.conf initfiles/nginx.conf-b
 
 deploy-daemon:
-	cat isubata.service | ssh isucon@${SRV_A} "sudo tee /etc/systemd/system/isubata.service"
-	ssh ${SRV_A} sudo systemctl daemon-reload
-	cat nginx.conf | ssh isucon@${SRV_A} "sudo tee /etc/nginx/nginx.conf"
-	ssh ${SRV_A} sudo systemctl restart nginx
+	cat isubata.service | ssh isucon@${SERVER_A} "sudo tee /etc/systemd/system/isubata.service"
+	ssh ${SERVER_A} sudo systemctl daemon-reload
+	cat nginx.conf | ssh isucon@${SERVER_A} "sudo tee /etc/nginx/nginx.conf"
+	ssh ${SERVER_A} sudo systemctl restart nginx
 
 deploy:
 	go build
-	ssh ${SRV_A} sudo systemctl stop isubata
-	scp isucon7-qual ${SRV_A}:/home/isucon/isubata/webapp/go/isubata
-	scp start.sh ${SRV_A}:/home/isucon/start.sh
-	ssh ${SRV_A} sudo systemctl start isubata
+	ssh ${SERVER_A} sudo systemctl stop isubata
+	scp isucon7-qual ${SERVER_A}:/home/isucon/isubata/webapp/go/isubata
+	scp start.sh ${SERVER_A}:/home/isucon/start.sh
+	ssh ${SERVER_A} sudo systemctl start isubata
 
 bench:
-	ssh ${SRV_BENCH} "cd isucon9-final && bench/bin/bench_linux run --payment=http://10.146.15.196:15000 --target=http://10.146.15.196:80 --assetdir=webapp/frontend/dist"
+	ssh ${SERVER_BENCH} "cd isucon9-final && bench/bin/bench_linux run --payment=http://10.146.15.196:15000 --target=http://10.146.15.196:80 --assetdir=webapp/frontend/dist"
 
 pprof:
 	go tool pprof -http="127.0.0.1:8020" logs/latest/cpu.pprof
 
 synclogs:
-	rsync -av isucon@${SRV_A}:/tmp/isucon/logs/ logs/
+	rsync -av isucon@${SERVER_A}:/tmp/isucon/logs/ logs/
