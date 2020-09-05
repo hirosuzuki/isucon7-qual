@@ -14,10 +14,11 @@ deploy-daemon:
 	ssh ${SRV_A} sudo systemctl restart nginx
 
 deploy:
-	ssh ${SRV_A} sudo systemctl stop isutrain
-	scp isucon9final ${SRV_A}:/home/isucon/isucon9-final/webapp/go/isucon9final
+	go build
+	ssh ${SRV_A} sudo systemctl stop isubata
+	scp isucon7-qual ${SRV_A}:/home/isucon/isubata/webapp/go/isubata
 	scp start.sh ${SRV_A}:/home/isucon/start.sh
-	ssh ${SRV_A} sudo systemctl start isutrain
+	ssh ${SRV_A} sudo systemctl start isubata
 
 bench:
 	ssh ${SRV_BENCH} "cd isucon9-final && bench/bin/bench_linux run --payment=http://10.146.15.196:15000 --target=http://10.146.15.196:80 --assetdir=webapp/frontend/dist"
