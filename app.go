@@ -13,6 +13,7 @@ import (
 	"math/rand"
 	"net/http"
 	"os"
+	"os/exec"
 	"strconv"
 	"strings"
 	"time"
@@ -23,6 +24,8 @@ import (
 	"github.com/labstack/echo"
 	"github.com/labstack/echo-contrib/session"
 	"github.com/labstack/echo/middleware"
+
+	tracer "github.com/hirosuzuki/go-isucon-tracer"
 )
 
 const (
@@ -68,7 +71,7 @@ func init() {
 		db_user, db_password, db_host, db_port)
 
 	log.Printf("Connecting to db: %q", dsn)
-	db, _ = sqlx.Connect("mysql", dsn)
+	db, _ = sqlx.Connect("mysql:logger", dsn)
 	for {
 		err := db.Ping()
 		if err == nil {
@@ -208,6 +211,15 @@ func getInitialize(c echo.Context) error {
 	db.MustExec("DELETE FROM channel WHERE id > 10")
 	db.MustExec("DELETE FROM message WHERE id > 10000")
 	db.MustExec("DELETE FROM haveread")
+
+	if true {
+		tracer.Start()
+		startCmd := exec.Command("sh", "/home/isucon/start.sh", tracer.TraceID)
+		startCmd.Stderr = os.Stderr
+		startCmd.Stdout = os.Stderr
+		startCmd.Start()
+	}
+
 	return c.String(204, "")
 }
 

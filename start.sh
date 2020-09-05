@@ -7,7 +7,7 @@ vmstat 1 90 > /tmp/vmstat.log 2>/dev/null  &
 
 sleep 90
 
-sudo pkill -HUP isucon9final
+sudo pkill -HUP isubata
 
 ACCESSLOG=/var/log/nginx/access.log.`date +%Y%m%d%H%M%S`
 sudo mv /var/log/nginx/access.log $ACCESSLOG

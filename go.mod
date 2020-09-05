@@ -8,6 +8,7 @@ require (
 	github.com/codahale/hdrhistogram v0.0.0-20161010025455-3a0bb77429bd // indirect
 	github.com/go-sql-driver/mysql v1.5.0
 	github.com/gorilla/sessions v1.1.3
+	github.com/hirosuzuki/go-isucon-tracer v0.2.0
 	github.com/jmoiron/sqlx v1.2.0
 	github.com/labstack/echo v3.2.3+incompatible
 	github.com/labstack/echo-contrib v0.0.0-20170921210119-4036746d4b33
