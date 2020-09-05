@@ -225,13 +225,10 @@ func updateHaveRead(userID int64, channelID int64, value int64) error {
 	}
 	haveReadMap[userID][channelID] = value
 
-	_, err := db.Exec("INSERT INTO haveread (user_id, channel_id, message_id, updated_at, created_at)"+
+	go db.Exec("INSERT INTO haveread (user_id, channel_id, message_id, updated_at, created_at)"+
 		" VALUES (?, ?, ?, NOW(), NOW())"+
 		" ON DUPLICATE KEY UPDATE message_id = ?, updated_at = NOW()",
 		userID, channelID, value, value)
-	if err != nil {
-		return err
-	}
 
 	return nil
 }
@@ -755,9 +752,15 @@ func postProfile(c echo.Context) error {
 			}
 		*/
 
-		fp, err := os.Create("/home/isucon/isubata/webapp/public/icons/" + avatarName)
-		fp.Write(avatarData)
-		defer fp.Close()
+		go func() {
+			fp, _ := os.Create("/home/isucon/isubata/webapp/public/icons/" + avatarName)
+			fp.Write(avatarData)
+			defer fp.Close()
+
+			rfp, _ := os.Create("/home/isucon/isubata/webapp/tmp_icon/icons/" + avatarName)
+			rfp.Write(avatarData)
+			defer rfp.Close()
+		}()
 
 		_, err = db.Exec("UPDATE user SET avatar_icon = ? WHERE id = ?", avatarName, self.ID)
 		if err != nil {
