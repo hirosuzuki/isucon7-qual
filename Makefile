@@ -1,11 +1,14 @@
-SRV_A=10.10.10.10
+SRV_A=34.84.242.242
 SRV_BENCH=10.10.10.10
 
 build:
 	go build
 
+init-load:
+	scp ${SRV_A}:/etc/nginx/nginx.conf .
+
 deploy-daemon:
-	cat isutrain.service | ssh isucon@${SRV_A} "sudo tee /etc/systemd/system/isutrain.service"
+	cat isubata.service | ssh isucon@${SRV_A} "sudo tee /etc/systemd/system/isubata.service"
 	ssh ${SRV_A} sudo systemctl daemon-reload
 	cat nginx.conf | ssh isucon@${SRV_A} "sudo tee /etc/nginx/nginx.conf"
 	ssh ${SRV_A} sudo systemctl restart nginx
