@@ -463,11 +463,38 @@ func fetchUnread(c echo.Context) error {
 
 	resp := []map[string]interface{}{}
 
+	type HaveRead struct {
+		ChannelID int64 `db:"channel_id"`
+		MessageID int64 `db:"message_id"`
+	}
+
+	hs := []HaveRead{}
+	err = db.Select(&hs, "SELECT channel_id, message_id FROM haveread WHERE user_id = ?", userID)
+	if err != nil {
+		return err
+	}
+	hrmap := map[int64]int64{}
+	for _, h := range hs {
+		hrmap[h.ChannelID] = h.MessageID
+	}
+
+	type MessageCound struct {
+		ChannelID int64 `db:"channel_id"`
+		Count     int64 `db:"cnt"`
+	}
+
+	mcs := []MessageCound{}
+	err = db.Select(&mcs, "SELECT channel_id, COUNT(*) cnt FROM message GROUP BY channel_id")
+	if err != nil {
+		return err
+	}
+	mcmap := map[int64]int64{}
+	for _, mc := range mcs {
+		mcmap[mc.ChannelID] = mc.Count
+	}
+
 	for _, chID := range channels {
-		lastID, err := queryHaveRead(userID, chID)
-		if err != nil {
-			return err
-		}
+		lastID := hrmap[chID]
 
 		var cnt int64
 		if lastID > 0 {
@@ -475,9 +502,12 @@ func fetchUnread(c echo.Context) error {
 				"SELECT COUNT(*) as cnt FROM message WHERE channel_id = ? AND ? < id",
 				chID, lastID)
 		} else {
-			err = db.Get(&cnt,
-				"SELECT COUNT(*) as cnt FROM message WHERE channel_id = ?",
-				chID)
+			_, ok := mcmap[chID]
+			if ok {
+				cnt = mcmap[chID]
+			} else {
+				cnt = 0
+			}
 		}
 		if err != nil {
 			return err
