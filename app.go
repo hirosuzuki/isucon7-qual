@@ -216,6 +216,26 @@ func register(name, password string) (int64, error) {
 var userMap map[int64]User = map[int64]User{}
 var messageNums map[int64]int64 = map[int64]int64{}
 
+var haveReadMap map[int64]map[int64]int64 = map[int64]map[int64]int64{}
+
+func updateHaveRead(userID int64, channelID int64, value int64) error {
+	_, ok := haveReadMap[userID]
+	if !ok {
+		haveReadMap[userID] = map[int64]int64{}
+	}
+	haveReadMap[userID][channelID] = value
+
+	_, err := db.Exec("INSERT INTO haveread (user_id, channel_id, message_id, updated_at, created_at)"+
+		" VALUES (?, ?, ?, NOW(), NOW())"+
+		" ON DUPLICATE KEY UPDATE message_id = ?, updated_at = NOW()",
+		userID, channelID, value, value)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func getInitialize(c echo.Context) error {
 	db.MustExec("DELETE FROM user WHERE id > 1000")
 	db.MustExec("DELETE FROM image WHERE id > 1001")
@@ -415,6 +435,7 @@ func jsonifyMessage(m Message) (map[string]interface{}, error) {
 }
 
 func getMessage(c echo.Context) error {
+
 	userID := sessUserID(c)
 	if userID == 0 {
 		return c.NoContent(http.StatusForbidden)
@@ -429,10 +450,12 @@ func getMessage(c echo.Context) error {
 		return err
 	}
 
+	ph := tracer.Measure("getMessage", "queryMessages")
 	messages, err := queryMessages(chanID, lastID)
 	if err != nil {
 		return err
 	}
+	ph.End()
 
 	response := make([]map[string]interface{}, 0)
 	for i := len(messages) - 1; i >= 0; i-- {
@@ -444,15 +467,14 @@ func getMessage(c echo.Context) error {
 		response = append(response, r)
 	}
 
+	ph = tracer.Measure("getMessage", "INSERT INTO haveread")
 	if len(messages) > 0 {
-		_, err := db.Exec("INSERT INTO haveread (user_id, channel_id, message_id, updated_at, created_at)"+
-			" VALUES (?, ?, ?, NOW(), NOW())"+
-			" ON DUPLICATE KEY UPDATE message_id = ?, updated_at = NOW()",
-			userID, chanID, messages[0].ID, messages[0].ID)
+		err := updateHaveRead(userID, chanID, messages[0].ID)
 		if err != nil {
 			return err
 		}
 	}
+	ph.End()
 
 	return c.JSON(http.StatusOK, response)
 }
@@ -504,15 +526,7 @@ func fetchUnread(c echo.Context) error {
 		MessageID int64 `db:"message_id"`
 	}
 
-	hs := []HaveRead{}
-	err = db.Select(&hs, "SELECT channel_id, message_id FROM haveread WHERE user_id = ?", userID)
-	if err != nil {
-		return err
-	}
-	hrmap := map[int64]int64{}
-	for _, h := range hs {
-		hrmap[h.ChannelID] = h.MessageID
-	}
+	hrmap := haveReadMap[userID]
 
 	type MessageCound struct {
 		ChannelID int64 `db:"channel_id"`
