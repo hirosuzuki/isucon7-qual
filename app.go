@@ -240,6 +240,10 @@ func getInitialize(c echo.Context) error {
 	db.MustExec("DELETE FROM message WHERE id > 10000")
 	db.MustExec("DELETE FROM haveread")
 
+	userMap = map[int64]User{}
+	messageNums = map[int64]int64{}
+	haveReadMap = map[int64]map[int64]int64{}
+
 	type cct struct {
 		ChannelID int64 `db:"channel_id"`
 		Count     int64 `db:"cnt"`
@@ -259,7 +263,22 @@ func getInitialize(c echo.Context) error {
 
 	for i, u := range us {
 		userMap[u.ID] = us[i]
+		haveReadMap[u.ID] = map[int64]int64{}
 	}
+
+	type hrt struct {
+		UserID    int64 `db:"user_id"`
+		channelID int64 `db:"channel_id"`
+		messageID int64 `db:"message_id"`
+	}
+
+	hrs := []hrt{}
+	db.Select(&hrs, "SELECT user_id, channel_id, message_id FROM haveread")
+	for _, hr := range hrs {
+		haveReadMap[hr.UserID][hr.channelID] = hr.messageID
+	}
+
+	channelIDflushed = true
 
 	//fp, _ := os.Create("/tmp/outout.log")
 	//fmt.Fprintf(fp, "%v\n", us)
