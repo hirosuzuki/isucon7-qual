@@ -476,10 +476,16 @@ func getMessage(c echo.Context) error {
 	return c.JSON(http.StatusOK, response)
 }
 
+var channelIDflushed bool = true
+var channelIDs []int64 = []int64{}
+
 func queryChannels() ([]int64, error) {
-	res := []int64{}
-	err := db.Select(&res, "SELECT id FROM channel")
-	return res, err
+	if channelIDflushed {
+		err := db.Select(&channelIDs, "SELECT id FROM channel")
+		channelIDflushed = false
+		return channelIDs, err
+	}
+	return channelIDs, nil
 }
 
 func queryHaveRead(userID, chID int64) (int64, error) {
@@ -695,6 +701,7 @@ func postAddChannel(c echo.Context) error {
 	if err != nil {
 		return err
 	}
+	channelIDflushed = true
 
 	lastID, _ := res.LastInsertId()
 
