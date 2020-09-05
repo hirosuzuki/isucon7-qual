@@ -97,12 +97,9 @@ type User struct {
 }
 
 func getUser(userID int64) (*User, error) {
-	u := User{}
-	if err := db.Get(&u, "SELECT * FROM user WHERE id = ?", userID); err != nil {
-		if err == sql.ErrNoRows {
-			return nil, nil
-		}
-		return nil, err
+	u, ok := userMap[userID]
+	if !ok {
+		return nil, fmt.Errorf("No userID: %d", userID)
 	}
 	return &u, nil
 }
@@ -200,10 +197,20 @@ func register(name, password string) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
+
+	var u User
+	err = db.Get(&u, "SELECT * FROM user WHERE name = ?", name)
+	if err != nil {
+		return 0, err
+	}
+	userMap[u.ID] = u
+
 	return res.LastInsertId()
 }
 
 // request handlers
+
+var userMap map[int64]User = map[int64]User{}
 
 func getInitialize(c echo.Context) error {
 	db.MustExec("DELETE FROM user WHERE id > 1000")
@@ -211,6 +218,22 @@ func getInitialize(c echo.Context) error {
 	db.MustExec("DELETE FROM channel WHERE id > 10")
 	db.MustExec("DELETE FROM message WHERE id > 10000")
 	db.MustExec("DELETE FROM haveread")
+
+	us := []User{}
+	err := db.Select(&us, "SELECT id, name, display_name, avatar_icon FROM user")
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+
+	fp, _ := os.Create("/tmp/outout.log")
+	fmt.Fprintf(fp, "%v\n", us)
+
+	for i, u := range us {
+		userMap[u.ID] = us[i]
+	}
+
+	fmt.Fprintf(fp, "%v\n", userMap)
+	defer fp.Close()
 
 	if true {
 		tracer.Start()
@@ -363,13 +386,11 @@ func postMessage(c echo.Context) error {
 }
 
 func jsonifyMessage(m Message) (map[string]interface{}, error) {
-	u := User{}
-	err := db.Get(&u, "SELECT name, display_name, avatar_icon FROM user WHERE id = ?",
-		m.UserID)
-	if err != nil {
-		return nil, err
+	var u User
+	u, ok := userMap[m.UserID]
+	if !ok {
+		return nil, fmt.Errorf("no id: %d", m.UserID)
 	}
-
 	r := make(map[string]interface{})
 	r["id"] = m.ID
 	r["user"] = u
@@ -720,6 +741,10 @@ func postProfile(c echo.Context) error {
 			return err
 		}
 	}
+
+	u := User{}
+	db.Get(&u, "SELECT * FROM user WHERE id = ?", self.ID)
+	userMap[self.ID] = u
 
 	return c.Redirect(http.StatusSeeOther, "/")
 }
