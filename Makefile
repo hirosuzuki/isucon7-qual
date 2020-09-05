@@ -27,6 +27,7 @@ deploy:
 	ssh ${SERVER_A} sudo systemctl stop isubata
 	scp isucon7-qual ${SERVER_A}:/home/isucon/isubata/webapp/go/isubata
 	scp start.sh ${SERVER_A}:/home/isucon/start.sh
+	scp run.sh ${SERVER_A}:/home/isucon/isubata/webapp/go/run.sh
 	ssh ${SERVER_A} sudo systemctl start isubata
 
 bench:
