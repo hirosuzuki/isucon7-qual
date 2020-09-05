@@ -13,7 +13,6 @@ import (
 	"math/rand"
 	"net/http"
 	"os"
-	"os/exec"
 	"strconv"
 	"strings"
 	"time"
@@ -24,8 +23,6 @@ import (
 	"github.com/labstack/echo"
 	"github.com/labstack/echo-contrib/session"
 	"github.com/labstack/echo/middleware"
-
-	tracer "github.com/hirosuzuki/go-isucon-tracer"
 )
 
 const (
@@ -71,7 +68,7 @@ func init() {
 		db_user, db_password, db_host, db_port)
 
 	log.Printf("Connecting to db: %q", dsn)
-	db, _ = sqlx.Connect("mysql:logger", dsn)
+	db, _ = sqlx.Connect("mysql", dsn)
 	for {
 		err := db.Ping()
 		if err == nil {
@@ -285,14 +282,6 @@ func getInitialize(c echo.Context) error {
 	//fmt.Fprintf(fp, "%v\n", userMap)
 	//defer fp.Close()
 
-	if true {
-		tracer.Start()
-		startCmd := exec.Command("sh", "/home/isucon/start.sh", tracer.TraceID)
-		startCmd.Stderr = os.Stderr
-		startCmd.Stdout = os.Stderr
-		startCmd.Start()
-	}
-
 	return c.String(204, "")
 }
 
@@ -466,12 +455,10 @@ func getMessage(c echo.Context) error {
 		return err
 	}
 
-	ph := tracer.Measure("getMessage", "queryMessages")
 	messages, err := queryMessages(chanID, lastID)
 	if err != nil {
 		return err
 	}
-	ph.End()
 
 	response := make([]map[string]interface{}, 0)
 	for i := len(messages) - 1; i >= 0; i-- {
@@ -483,14 +470,12 @@ func getMessage(c echo.Context) error {
 		response = append(response, r)
 	}
 
-	ph = tracer.Measure("getMessage", "INSERT INTO haveread")
 	if len(messages) > 0 {
 		err := updateHaveRead(userID, chanID, messages[0].ID)
 		if err != nil {
 			return err
 		}
 	}
-	ph.End()
 
 	return c.JSON(http.StatusOK, response)
 }
