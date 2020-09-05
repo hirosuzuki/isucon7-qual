@@ -111,6 +111,9 @@ func addMessage(channelID, userID int64, content string) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
+
+	messageNums[channelID]++
+
 	return res.LastInsertId()
 }
 
@@ -211,6 +214,7 @@ func register(name, password string) (int64, error) {
 // request handlers
 
 var userMap map[int64]User = map[int64]User{}
+var messageNums map[int64]int64 = map[int64]int64{}
 
 func getInitialize(c echo.Context) error {
 	db.MustExec("DELETE FROM user WHERE id > 1000")
@@ -219,21 +223,31 @@ func getInitialize(c echo.Context) error {
 	db.MustExec("DELETE FROM message WHERE id > 10000")
 	db.MustExec("DELETE FROM haveread")
 
+	type cct struct {
+		ChannelID int64 `db:"channel_id"`
+		Count     int64 `db:"cnt"`
+	}
+
+	ccs := []cct{}
+	db.Select(&ccs, "SELECT channel_id, COUNT(*) cnt FROM message GROUP BY channel_id")
+	for _, cc := range ccs {
+		messageNums[cc.ChannelID] = cc.Count
+	}
+
 	us := []User{}
 	err := db.Select(&us, "SELECT id, name, display_name, avatar_icon FROM user")
 	if err != nil {
 		log.Fatal(err.Error())
 	}
 
-	fp, _ := os.Create("/tmp/outout.log")
-	fmt.Fprintf(fp, "%v\n", us)
-
 	for i, u := range us {
 		userMap[u.ID] = us[i]
 	}
 
-	fmt.Fprintf(fp, "%v\n", userMap)
-	defer fp.Close()
+	//fp, _ := os.Create("/tmp/outout.log")
+	//fmt.Fprintf(fp, "%v\n", us)
+	//fmt.Fprintf(fp, "%v\n", userMap)
+	//defer fp.Close()
 
 	if true {
 		tracer.Start()
@@ -505,16 +519,6 @@ func fetchUnread(c echo.Context) error {
 		Count     int64 `db:"cnt"`
 	}
 
-	mcs := []MessageCound{}
-	err = db.Select(&mcs, "SELECT channel_id, COUNT(*) cnt FROM message GROUP BY channel_id")
-	if err != nil {
-		return err
-	}
-	mcmap := map[int64]int64{}
-	for _, mc := range mcs {
-		mcmap[mc.ChannelID] = mc.Count
-	}
-
 	for _, chID := range channels {
 		lastID := hrmap[chID]
 
@@ -524,9 +528,9 @@ func fetchUnread(c echo.Context) error {
 				"SELECT COUNT(*) as cnt FROM message WHERE channel_id = ? AND ? < id",
 				chID, lastID)
 		} else {
-			_, ok := mcmap[chID]
+			_, ok := messageNums[chID]
 			if ok {
-				cnt = mcmap[chID]
+				cnt = messageNums[chID]
 			} else {
 				cnt = 0
 			}
@@ -680,7 +684,11 @@ func postAddChannel(c echo.Context) error {
 	if err != nil {
 		return err
 	}
+
 	lastID, _ := res.LastInsertId()
+
+	messageNums[lastID] = 0
+
 	return c.Redirect(http.StatusSeeOther,
 		fmt.Sprintf("/channel/%v", lastID))
 }
